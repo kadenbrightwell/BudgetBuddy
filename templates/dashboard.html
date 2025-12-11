@@ -1,57 +1,99 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="row">
-    <div class="col-md-8">
-        <h3>Your Expenses</h3>
-        <a href="{{ url_for('add_expense') }}" class="btn btn-success mb-3">Add New Expense</a>
-        <table class="table table-striped">
-            <thead>
-                <tr>
-                    <th>Category</th>
-                    <th>Description</th>
-                    <th>Amount</th>
-                    <th>Date</th>
-                    <th>Action</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for expense in expenses %}
-                <tr>
-                    <td>{{ expense.category }}</td>
-                    <td>{{ expense.description }}</td>
-                    <td>${{ expense.amount }}</td>
-                    <td>{{ expense.date.strftime('%Y-%m-%d') }}</td>
-                    <td>
-                        <a href="{{ url_for('delete_expense', id=expense.id) }}" class="btn btn-danger btn-sm" onclick="return confirm('Delete this?')">Delete</a>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
 
-    <div class="col-md-4">
-        <h3>Spending Breakdown</h3>
-        <canvas id="expenseChart"></canvas>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h3>
+        {% if current_folder %}
+            <a href="{{ url_for('dashboard') }}" class="text-decoration-none text-muted">Home</a> / {{ current_folder.name }}
+        {% else %}
+            Home
+        {% endif %}
+    </h3>
+    <div class="dropdown">
+        <button class="btn btn-light rounded-circle" data-bs-toggle="dropdown" style="width:50px; height:50px; font-size:24px;">+</button>
+        <ul class="dropdown-menu dropdown-menu-end">
+            <li><button class="dropdown-item" data-bs-toggle="modal" data-bs-target="#addFolderModal">New Folder</button></li>
+            <li><button class="dropdown-item" data-bs-toggle="modal" data-bs-target="#addTrackerModal">New Tracker</button></li>
+            <li><button class="dropdown-item" data-bs-toggle="modal" data-bs-target="#addTimerModal">New Timer</button></li>
+        </ul>
     </div>
 </div>
 
-<script>
-    // Get data passed from Flask
-    const chartData = {{ chart_data | tojson }};
-    const labels = Object.keys(chartData);
-    const data = Object.values(chartData);
+<div class="row g-3">
+    {% for folder in folders %}
+    <div class="col-6 col-md-3">
+        <a href="{{ url_for('dashboard', folder_id=folder.id) }}" class="text-decoration-none">
+            <div class="card h-100 text-center p-3" style="border-top: 5px solid {{ folder.color }};">
+                <i class="bi bi-folder-fill display-4 text-warning"></i> <h5 class="mt-2 text-white">{{ folder.name }}</h5>
+            </div>
+        </a>
+    </div>
+    {% endfor %}
 
-    const ctx = document.getElementById('expenseChart').getContext('2d');
-    new Chart(ctx, {
-        type: 'doughnut',
-        data: {
-            labels: labels,
-            datasets: [{
-                data: data,
-                backgroundColor: ['#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF']
-            }]
-        }
-    });
-</script>
+    {% for tracker in trackers %}
+    <div class="col-6 col-md-3">
+        <div class="card h-100 p-3" style="border-top: 5px solid {{ tracker.color }};">
+            <h5 class="text-center">{{ tracker.name }}</h5>
+            <h2 class="text-center display-6 my-3">{{ tracker.value }}</h2>
+            <form action="{{ url_for('update_tracker', id=tracker.id) }}" method="POST" class="d-flex gap-2">
+                <input type="number" step="any" name="amount" class="form-control form-control-sm" placeholder="+/-">
+                <button class="btn btn-sm btn-light">Go</button>
+            </form>
+        </div>
+    </div>
+    {% endfor %}
+
+    {% for timer in timers %}
+    <div class="col-6 col-md-3">
+        <div class="card h-100 p-3 text-center" style="border-top: 5px solid {{ timer.color }};">
+            <h5>{{ timer.name }}</h5>
+            <i class="bi bi-stopwatch display-5 my-2 text-danger"></i>
+            <small class="text-muted">Target: {{ timer.target_date.strftime('%Y-%m-%d %H:%M') }}</small>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<div class="modal fade" id="addFolderModal" tabindex="-1">
+    <div class="modal-dialog">
+        <form method="POST" action="{{ url_for('create_folder') }}" class="modal-content">
+            <div class="modal-header"><h5 class="modal-title">New Folder</h5></div>
+            <div class="modal-body">
+                <input type="text" name="name" class="form-control mb-2" placeholder="Folder Name" required>
+                <input type="color" name="color" class="form-control form-control-color mb-2" value="#0d6efd" title="Color">
+                <input type="hidden" name="parent_id" value="{{ current_folder.id if current_folder else '' }}">
+            </div>
+            <div class="modal-footer"><button class="btn btn-primary">Create</button></div>
+        </form>
+    </div>
+</div>
+
+<div class="modal fade" id="addTrackerModal" tabindex="-1">
+    <div class="modal-dialog">
+        <form method="POST" action="{{ url_for('create_tracker') }}" class="modal-content">
+            <div class="modal-header"><h5 class="modal-title">New Tracker</h5></div>
+            <div class="modal-body">
+                <input type="text" name="name" class="form-control mb-2" placeholder="Tracker Name" required>
+                <input type="color" name="color" class="form-control form-control-color mb-2" value="#198754">
+                <input type="hidden" name="parent_id" value="{{ current_folder.id if current_folder else '' }}">
+            </div>
+            <div class="modal-footer"><button class="btn btn-primary">Create</button></div>
+        </form>
+    </div>
+</div>
+
+<div class="modal fade" id="addTimerModal" tabindex="-1">
+    <div class="modal-dialog">
+        <form method="POST" action="{{ url_for('create_timer') }}" class="modal-content">
+            <div class="modal-header"><h5 class="modal-title">New Timer</h5></div>
+            <div class="modal-body">
+                <input type="text" name="name" class="form-control mb-2" placeholder="Timer Name" required>
+                <input type="datetime-local" name="target_date" class="form-control mb-2" required>
+                <input type="color" name="color" class="form-control form-control-color mb-2" value="#dc3545">
+                <input type="hidden" name="parent_id" value="{{ current_folder.id if current_folder else '' }}">
+            </div>
+            <div class="modal-footer"><button class="btn btn-primary">Create</button></div>
+        </form>
+    </div>
+</div>
 {% endblock %}
